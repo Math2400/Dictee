@@ -177,13 +177,19 @@ $BtnAction.Add_Click({
                 Log "--- TERMINE AVEC SUCCES ---"
                 
                 # --- Logique Shortcut ---
-                if ($createShortcut) {
+                if ($ChkShortcut.Checked) {
                     Log "Creation du raccourci sur le bureau..."
-                    $desktopPath = [Environment]::GetFolderPath("Desktop")
-                    $shortcutPath = Join-Path $desktopPath "Dictee Intelligente.bat"
-                    # On utilise TxtPath.Text au lieu de targetDir pour etre sur du scope
-                    $finalPath = $TxtPath.Text
-                    "@echo off`ncd /d `"$finalPath`"`nstart LANCER_APP.bat" | Out-File $shortcutPath -Encoding ascii
+                    try {
+                        $wshell = New-Object -ComObject WScript.Shell
+                        $desktopPath = $wshell.SpecialFolders.Item("Desktop")
+                        $shortcutPath = Join-Path $desktopPath "Dictee Intelligente.bat"
+                        $instPath = $TxtPath.Text
+                        $batContent = "@echo off`r`ncd /d `"$instPath`"`r`nstart LANCER_APP.bat"
+                        $batContent | Out-File -FilePath $shortcutPath -Encoding ascii -Force
+                        Log "Raccourci cree avec succes sur le bureau."
+                    } catch {
+                        Log "Erreur lors de la creation du raccourci : $($_.Exception.Message)"
+                    }
                 }
                 
                 Log "Lancement de l'application..."
@@ -191,9 +197,13 @@ $BtnAction.Add_Click({
                 $this.Stop()
                 
                 # Lancement
-                $finalPath = $TxtPath.Text
-                Set-Location $finalPath
-                Start-Process "cmd.exe" "/c LANCER_APP.bat"
+                $instPath = $TxtPath.Text
+                if (Test-Path (Join-Path $instPath "LANCER_APP.bat")) {
+                    Set-Location $instPath
+                    Start-Process "cmd.exe" "/c LANCER_APP.bat"
+                } else {
+                    Log "ERREUR : LANCER_APP.bat non trouve dans $instPath"
+                }
             } elseif ($line -like "ERREUR*") {
                 Log $line
                 $BtnAction.Enabled = $true
