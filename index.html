@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Système de dictée intelligente avec IA pour améliorer votre maîtrise du français">
+  <title>Dictée Intelligente — Maîtrisez le Français</title>
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+  
+  <!-- Styles -->
+  <link rel="stylesheet" href="/src/styles/index.css">
+  <link rel="stylesheet" href="/src/styles/components.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Navigation -->
+    <nav class="main-nav">
+      <div class="nav-brand">
+        <span class="brand-icon">📝</span>
+        <span class="brand-text">Dictée Intelligente</span>
+      </div>
+      <div class="nav-links">
+        <a href="#/" class="nav-link" data-route="dashboard">Tableau de Bord</a>
+        <a href="#/dictation" class="nav-link" data-route="dictation">Dictée</a>
+        <a href="#/vocabulary" class="nav-link" data-route="vocabulary">Vocabulaire</a>
+        <a href="#/settings" class="nav-link" data-route="settings">Paramètres</a>
+      </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main id="main-content" class="main-content">
+      <!-- Dynamic content loaded here -->
+    </main>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container" class="toast-container"></div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
