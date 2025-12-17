@@ -75,6 +75,15 @@ $BtnAction.Font = $FontButton
 $BtnAction.FlatStyle = "Flat"
 $Form.Controls.Add($BtnAction)
 
+# --- Checkbox Raccourci ---
+$ChkShortcut = New-Object System.Windows.Forms.CheckBox
+$ChkShortcut.Text = "Créer un raccourci sur le bureau"
+$ChkShortcut.ForeColor = [System.Drawing.Color]::White
+$ChkShortcut.Location = New-Object System.Drawing.Point(30, 230)
+$ChkShortcut.AutoSize = $true
+$ChkShortcut.Checked = $true
+$Form.Controls.Add($ChkShortcut)
+
 # --- Log Box ---
 $TxtLog = New-Object System.Windows.Forms.TextBox
 $TxtLog.Multiline = $true
@@ -100,6 +109,7 @@ $BtnBrowse.Add_Click({
 
 $BtnAction.Add_Click({
     $targetDir = $TxtPath.Text
+    $createShortcut = $ChkShortcut.Checked
     $BtnAction.Enabled = $false
     Log "Demarrage du processus pour : $targetDir"
     
@@ -133,9 +143,6 @@ $BtnAction.Add_Click({
             Set-Location $path
             if (!(Test-Path ".git")) {
                 LocalLog "Telechargement du projet (Clone)..."
-                # On clone dans un dossier temporaire puis on déplace ou on clone tout court
-                # Si le dossier n'est pas vide, git clone $repo . échouera
-                # On utilise une astuce : init + remote + pull
                 git init | Out-Null
                 git remote add origin $repo | Out-Null
                 git fetch origin | Out-Null
@@ -168,8 +175,23 @@ $BtnAction.Add_Click({
         foreach ($line in $data) {
             if ($line -eq "SUCCES") {
                 Log "--- TERMINE AVEC SUCCES ---"
+                
+                # --- Logique Shortcut ---
+                if ($createShortcut) {
+                    Log "Creation du raccourci sur le bureau..."
+                    $desktopPath = [Environment]::GetFolderPath("Desktop")
+                    $shortcutPath = Join-Path $desktopPath "Dictee Intelligente.bat"
+                    $launcherPath = Join-Path $targetDir "LANCER_APP.bat"
+                    "@echo off`ncd /d `"$targetDir`"`nstart LANCER_APP.bat" | Out-File $shortcutPath -Encoding ascii
+                }
+                
+                Log "Lancement de l'application..."
                 $BtnAction.Text = "PRET !"
                 $this.Stop()
+                
+                # Lancement
+                Set-Location $targetDir
+                Start-Process "cmd.exe" "/c LANCER_APP.bat"
             } elseif ($line -like "ERREUR*") {
                 Log $line
                 $BtnAction.Enabled = $true
@@ -181,5 +203,7 @@ $BtnAction.Add_Click({
     })
     $Timer.Start()
 })
+
+$Form.ShowDialog() | Out-Null
 
 $Form.ShowDialog() | Out-Null
