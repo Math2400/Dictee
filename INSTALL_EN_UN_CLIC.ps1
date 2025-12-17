@@ -1,33 +1,43 @@
 # INSTALLATEUR_DICTEE.ps1
-# Interface Graphique Professionnelle pour l'Installation et la Mise à Jour
+# Version stable avec chargement robuste des bibliotheques Windows
 
-Add-Type -AssemblyName PresentationFramework, System.Drawing, System.Windows.Forms
+# --- Chargement force des composants Windows ---
+try {
+    Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase, System.Xaml, System.Windows.Forms
+} catch {
+    Write-Host "Erreur de chargement des bibliotheques Windows UI."
+    exit
+}
 
 # --- Définition de l'Interface (XAML) ---
-[xml]$XAML = @"
+# On utilise une version ultra-simple du XAML pour eviter les erreurs de parsing
+$xamlData = @"
 <Window xmlns="http://schemas.microsoft.com/winfx/2000/xaml/presentation"
-        Title="Installateur Dictée Intelligente" Height="500" Width="600" Background="#110c1d" WindowStartupLocation="CenterScreen">
+        xmlns:x="http://schemas.microsoft.com/winfx/2000/xaml"
+        Title="Dictee Intelligente - Installation" Height="500" Width="600" Background="#110c1d" WindowStartupLocation="CenterScreen">
     <StackPanel Margin="30">
-        <TextBlock Text="Dictée Intelligente - Setup" FontSize="28" Foreground="White" FontWeight="Bold" Margin="0,0,0,10"/>
-        <TextBlock Text="Synchronisation et Installation par Intelligence Artificielle" Foreground="#8b80f9" Margin="0,0,0,30"/>
+        <TextBlock Text="Dictee Intelligente - Setup" FontSize="28" Foreground="White" FontWeight="Bold" Margin="0,0,0,10"/>
+        <TextBlock Text="Installation et mise a jour automatique" Foreground="#8b80f9" Margin="0,0,0,30"/>
         
-        <TextBlock Text="Choisissez le dossier d'installation :" Foreground="White" Margin="0,0,0,5"/>
+        <TextBlock Text="Dossier d'installation :" Foreground="White" Margin="0,0,0,5"/>
         <DockPanel Margin="0,0,0,20">
-            <Button Name="btnBrowse" Content="Parcourir..." Width="100" DockPanel.Dock="Right" />
+            <Button Name="btnBrowse" Content="Parcourir" Width="100" DockPanel.Dock="Right" Background="#3f3a5f" Foreground="White"/>
             <TextBox Name="txtPath" Height="30" VerticalContentAlignment="Center" Margin="0,0,10,0" Padding="5" Background="#1e1b2e" Foreground="White" BorderBrush="#3f3a5f"/>
         </DockPanel>
 
-        <Button Name="btnAction" Content="INSTALLER / METTRE À JOUR" Height="45" Background="#8b80f9" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
+        <Button Name="btnAction" Content="INSTALLER / METTRE A JOUR" Height="45" Background="#8b80f9" Foreground="White" FontWeight="Bold"/>
         
-        <TextBlock Text="Étapes de progression :" Foreground="White" Margin="0,20,0,5"/>
-        <ScrollViewer Height="150" Background="#0a0812" MaxHeight="150">
-            <TextBlock Name="txtLog" Foreground="#bbbbbb" TextWrapping="Wrap" Padding="10" FontFamily="Consolas" FontSize="11"/>
-        </ScrollViewer>
+        <TextBlock Text="Log d'installation :" Foreground="White" Margin="0,20,0,5"/>
+        <Border Background="#0a0812" Height="150">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <TextBlock Name="txtLog" Foreground="#bbbbbb" TextWrapping="Wrap" Padding="10" FontFamily="Consolas" FontSize="11"/>
+            </ScrollViewer>
+        </Border>
     </StackPanel>
 </Window>
 "@
 
-$reader = (New-Object System.Xml.XmlNodeReader $XAML)
+$reader = [System.Xml.XmlReader]::Create([System.IO.StringReader] $xamlData)
 $Window = [Windows.Markup.XamlReader]::Load($reader)
 
 # --- Variables des éléments ---
@@ -41,84 +51,85 @@ $txtPath.Text = Join-Path $env:USERPROFILE "Desktop\Dictee"
 
 # --- Fonctions ---
 function Log($msg) {
-    $txtLog.Text += "[$(Get-Date -Format 'HH:mm:ss')] $msg`n"
+    if ($Window.Dispatcher.CheckAccess()) {
+        $txtLog.Text += "[$(Get-Date -Format 'HH:mm:ss')] $msg`n"
+    } else {
+        $Window.Dispatcher.Invoke([Action[string]]{ param($m) $txtLog.Text += "[$(Get-Date -Format 'HH:mm:ss')] $m`n" }, $msg)
+    }
 }
 
 $btnBrowse.Add_Click({
     $Dialog = New-Object System.Windows.Forms.FolderBrowserDialog
-    $Dialog.Description = "Sélectionnez le dossier pour l'application"
-    if ($Dialog.ShowDialog() -eq "OK") {
-        $txtPath.Text = $Dialog.SelectedPath
-    }
+    if ($Dialog.ShowDialog() -eq "OK") { $txtPath.Text = $Dialog.SelectedPath }
 })
 
 $btnAction.Add_Click({
     $targetDir = $txtPath.Text
     $btnAction.IsEnabled = $false
+    Log "Demarrage du processus pour : $targetDir"
     
-    # Exécution asynchrone pour ne pas bloquer l'UI
-    Start-Job -ScriptBlock {
-        param($path, $repo)
+    Start-ThreadJob -ScriptBlock {
+        param($path, $repo, $windowObj)
         
-        function InternalLog($m) { Write-Output $m }
+        function LocalLog($m) { Write-Output $m }
         
-        # 1. Vérification Dépendances
-        if (!(Get-Command winget -ErrorAction SilentlyContinue)) {
-            return "ERREUR: Winget manquant."
-        }
-        
-        if (!(Get-Command git -ErrorAction SilentlyContinue)) {
-            InternalLog "Installation de Git en cours..."
-            winget install --id Git.Git -e --source winget --silent --accept-package-agreements --accept-source-agreements
-        }
-        
-        if (!(Get-Command node -ErrorAction SilentlyContinue)) {
-            InternalLog "Installation de Node.js en cours..."
-            winget install --id OpenJS.NodeJS -e --source winget --silent --accept-package-agreements --accept-source-agreements
-        }
-        
-        # 2. Gestion du dossier
-        if (!(Test-Path $path)) {
-            InternalLog "Creation du dossier et telechargement (Clone)..."
-            New-Item -ItemType Directory -Path $path -Force | Out-Null
+        try {
+            # 1. Verification Winget
+            if (!(Get-Command winget -ErrorAction SilentlyContinue)) { return "ERREUR: Winget absente." }
+            
+            # 2. Git
+            if (!(Get-Command git -ErrorAction SilentlyContinue)) {
+                LocalLog "Installation de Git..."
+                winget install --id Git.Git -e --source winget --silent --accept-package-agreements --accept-source-agreements
+            }
+            
+            # 3. Node
+            if (!(Get-Command node -ErrorAction SilentlyContinue)) {
+                LocalLog "Installation de Node.js..."
+                winget install --id OpenJS.NodeJS -e --source winget --silent --accept-package-agreements --accept-source-agreements
+            }
+            
+            # 4. Dossier
+            if (!(Test-Path $path)) {
+                LocalLog "Creation du dossier..."
+                New-Item -ItemType Directory -Path $path -Force | Out-Null
+                $parent = Split-Path $path
+                cd $parent
+                git clone $repo $path
+            } else {
+                LocalLog "Mise a jour du dossier existant..."
+                Set-Location $path
+                git pull origin master
+            }
+            
+            # 5. NPM
             Set-Location $path
-            cd ..
-            git clone $repo $path
-        } else {
-            InternalLog "Dossier detecte, mise a jour (Pull)..."
-            Set-Location $path
-            git pull origin master
+            LocalLog "Installation des modules npm..."
+            npm install
+            
+            return "SUCCES"
+        } catch {
+            return "ERREUR : $($_.Exception.Message)"
         }
-        
-        # 3. NPM Install
-        InternalLog "Installation des composants (npm install)..."
-        npm install
-        
-        return "SUCCES"
-    } -ArgumentList $targetDir, "https://github.com/Math2400/Dictee.git" | Out-Null
+    } -ArgumentList $targetDir, "https://github.com/Math2400/Dictee.git", $Window | Out-Null
     
-    # Polling pour le log
-    Log "Demarrage du processus..."
-    
-    # On surveille les résultats
+    # Surveillance du job
     $timer = New-Object System.Windows.Threading.DispatcherTimer
     $timer.Interval = [TimeSpan]::FromSeconds(1)
     $timer.Add_Tick({
-        $job = Get-Job | Where-Object { $_.State -eq "Running" -or $_.State -eq "Completed" } | Select-Object -Last 1
-        if ($job) {
-            $results = Receive-Job $job
-            foreach ($res in $results) {
-                if ($res -eq "SUCCES") {
-                    Log "TERMINE ! Vous pouvez fermer cette fenetre."
-                    $btnAction.Content = "PRET !"
-                    $timer.Stop()
-                } elseif ($res -like "ERREUR*") {
-                    Log "ERREUR : $res"
-                    $btnAction.IsEnabled = $true
-                    $timer.Stop()
-                } else {
-                    Log $res
-                }
+        $job = Get-Job | Select-Object -Last 1
+        $data = Receive-Job $job
+        foreach ($line in $data) {
+            if ($line -eq "SUCCES") {
+                Log "--- TERMINE AVEC SUCCES ---"
+                $btnAction.Content = "PRÊT !"
+                $timer.Stop()
+            } elseif ($line -like "ERREUR*") {
+                Log $line
+                $btnAction.IsEnabled = $true
+                $timer.Stop()
+            } else {
+                Log $line
             }
         }
     })
