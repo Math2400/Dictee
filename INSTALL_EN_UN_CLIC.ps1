@@ -124,23 +124,34 @@ $BtnAction.Add_Click({
                 winget install --id OpenJS.NodeJS -e --source winget --silent --accept-package-agreements --accept-source-agreements
             }
             
-            # 4. Dossier
+            # 4. Dossier et Git
             if (!(Test-Path $path)) {
                 LocalLog "Creation du dossier..."
                 New-Item -ItemType Directory -Path $path -Force | Out-Null
-                $parent = Split-Path $path
-                cd $parent
-                git clone $repo $path
+            }
+
+            Set-Location $path
+            if (!(Test-Path ".git")) {
+                LocalLog "Telechargement du projet (Clone)..."
+                # On clone dans un dossier temporaire puis on déplace ou on clone tout court
+                # Si le dossier n'est pas vide, git clone $repo . échouera
+                # On utilise une astuce : init + remote + pull
+                git init | Out-Null
+                git remote add origin $repo | Out-Null
+                git fetch origin | Out-Null
+                git checkout -f master | Out-Null
             } else {
-                LocalLog "Mise a jour du dossier existant..."
-                Set-Location $path
-                git pull origin master
+                LocalLog "Mise a jour du projet (Pull)..."
+                git pull origin master | Out-Null
             }
             
             # 5. NPM
-            Set-Location $path
-            LocalLog "Installation des modules npm..."
-            npm install
+            if (!(Test-Path "package.json")) {
+                return "ERREUR : package.json non trouve dans $path"
+            }
+            
+            LocalLog "Installation des modules npm (cela peut prendre du temps)..."
+            npm install --silent
             
             return "SUCCES"
         } catch {
@@ -158,11 +169,11 @@ $BtnAction.Add_Click({
             if ($line -eq "SUCCES") {
                 Log "--- TERMINE AVEC SUCCES ---"
                 $BtnAction.Text = "PRET !"
-                $Timer.Stop()
+                $this.Stop()
             } elseif ($line -like "ERREUR*") {
                 Log $line
                 $BtnAction.Enabled = $true
-                $Timer.Stop()
+                $this.Stop()
             } else {
                 Log $line
             }
