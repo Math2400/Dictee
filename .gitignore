@@ -33,3 +33,7 @@ dist-ssr
 data/
 backups/
 private/
+
+# Multiplayer Shared Results (MUST BE TRACKED)
+!shared_results/
+!shared_results/**

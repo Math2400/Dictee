@@ -68,37 +68,37 @@ $btnAction.Add_Click({
         }
         
         if (!(Get-Command git -ErrorAction SilentlyContinue)) {
-            InternalLog "🔧 Installation de Git..."
+            InternalLog "Installation de Git en cours..."
             winget install --id Git.Git -e --source winget --silent --accept-package-agreements --accept-source-agreements
         }
         
         if (!(Get-Command node -ErrorAction SilentlyContinue)) {
-            InternalLog "🔧 Installation de Node.js..."
+            InternalLog "Installation de Node.js en cours..."
             winget install --id OpenJS.NodeJS -e --source winget --silent --accept-package-agreements --accept-source-agreements
         }
         
         # 2. Gestion du dossier
         if (!(Test-Path $path)) {
-            InternalLog "📂 Création du dossier et téléchargement (Clone)..."
+            InternalLog "Creation du dossier et telechargement (Clone)..."
             New-Item -ItemType Directory -Path $path -Force | Out-Null
             Set-Location $path
             cd ..
             git clone $repo $path
         } else {
-            InternalLog "🔄 Dossier détecté, mise à jour (Pull)..."
+            InternalLog "Dossier detecte, mise a jour (Pull)..."
             Set-Location $path
             git pull origin master
         }
         
         # 3. NPM Install
-        InternalLog "📦 Installation des dépendances du projet..."
+        InternalLog "Installation des composants (npm install)..."
         npm install
         
-        return "SUCCÈS"
+        return "SUCCES"
     } -ArgumentList $targetDir, "https://github.com/Math2400/Dictee.git" | Out-Null
     
-    # Polling pour le log (simplifié pour la démo)
-    Log "Démarrage du processus..."
+    # Polling pour le log
+    Log "Demarrage du processus..."
     
     # On surveille les résultats
     $timer = New-Object System.Windows.Threading.DispatcherTimer
@@ -108,12 +108,12 @@ $btnAction.Add_Click({
         if ($job) {
             $results = Receive-Job $job
             foreach ($res in $results) {
-                if ($res -eq "SUCCÈS") {
-                    Log "✅ TERMINÉ ! Vous pouvez fermer cette fenêtre."
-                    $btnAction.Content = "PRÊT !"
+                if ($res -eq "SUCCES") {
+                    Log "TERMINE ! Vous pouvez fermer cette fenetre."
+                    $btnAction.Content = "PRET !"
                     $timer.Stop()
                 } elseif ($res -like "ERREUR*") {
-                    Log "❌ $res"
+                    Log "ERREUR : $res"
                     $btnAction.IsEnabled = $true
                     $timer.Stop()
                 } else {
