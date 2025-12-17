@@ -79,9 +79,47 @@ export class SettingsView {
               >
               <button class="btn btn-primary" id="add-api-key">Ajouter</button>
             </div>
-            <p class="input-hint ${geminiService.isInitialized() ? 'success' : 'error'}">
-              ${geminiService.isInitialized() ? '✓ Service IA prêt' : '⚠️ Aucune clé configurée'}
-            </p>
+            <div class="api-status-row">
+                <p class="input-hint ${geminiService.isInitialized() ? 'success' : 'error'}">
+                    ${geminiService.isInitialized() ? '✓ Service IA prêt' : '⚠️ Aucune clé configurée'}
+                </p>
+                <button class="btn btn-ghost btn-sm text-gradient" id="toggle-tutorial">❓ Besoin d'aide ? Voir le tutoriel</button>
+            </div>
+          </div>
+
+          <!-- API Tutorial Section (Hidden by default) -->
+          <div id="api-tutorial" class="api-tutorial card glass hide">
+            <div class="tutorial-header">
+                <h3>📖 Tutoriel : Configurer votre IA Gemini</h3>
+                <span class="text-xs text-muted">Dernière mise à jour : 17/12/2025</span>
+            </div>
+            
+            <div class="tutorial-body">
+                <p>Pour faire fonctionner l'intelligence artificielle, vous avez besoin d'une "clé API" gratuite fournie par Google.</p>
+                
+                <ol class="tutorial-list">
+                    <li>
+                        <strong>Obtenir votre clé :</strong> Allez sur <a href="https://aistudio.google.com/apikey" target="_blank">Google AI Studio</a>. Connectez-vous avec votre compte Google et cliquez sur <em>"Create API key"</em>.
+                    </li>
+                    <li>
+                        <strong>Comprendre les Quotas (Limites) :</strong>
+                        <ul>
+                            <li><strong>Version Gratuite :</strong> Limitée à environ 15 requêtes par minute et 1500 par jour. Vos données peuvent être utilisées par Google pour améliorer leurs modèles.</li>
+                            <li><strong>Version Payante :</strong> Pas de limite de quota stricte (payé à l'usage) et vos données restent **privées**.</li>
+                        </ul>
+                    </li>
+                    <li>
+                        <strong>Maximiser l'utilisation :</strong> Vous pouvez créer **jusqu'à 15 clés différentes** sur votre compte Google. Ajoutez-les toutes ici ! L'application passera automatiquement de l'une à l'autre quand une est saturée, multipliant ainsi votre capacité d'utilisation quotidienne.
+                    </li>
+                    <li>
+                        <strong>Installation :</strong> Copiez la clé (elle commence par <code>AIza...</code>) et collez-la ci-dessus, puis validez avec "Ajouter".
+                    </li>
+                </ol>
+                
+                <div class="alert alert-info">
+                    💡 <strong>Astuce :</strong> Si vous utilisez l'application intensément, avoir 3 ou 4 clés enregistrées vous garantit une expérience fluide toute la journée.
+                </div>
+            </div>
           </div>
         </section>
 
@@ -330,6 +368,18 @@ export class SettingsView {
         .add-key-btn { width: 24px; height: 24px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 4px; border: 1px dashed var(--color-border); }
         .add-key-btn:hover { border-color: var(--color-primary-400); color: var(--color-primary-400); }
         .add-key-btn.listening { border-color: var(--color-primary-400); color: var(--color-primary-400); animation: pulse 1s infinite; background: rgba(59, 130, 246, 0.1); }
+        .api-status-row { display: flex; justify-content: space-between; align-items: center; margin-top: var(--space-2); }
+        .api-tutorial { margin-top: var(--space-4); border: 1px solid var(--color-surface-glass-border); padding: var(--space-4); }
+        .api-tutorial.hide { display: none; }
+        .tutorial-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4); border-bottom: 1px solid var(--color-surface-glass-border); padding-bottom: var(--space-2); }
+        .tutorial-header h3 { font-size: 1.1rem; margin: 0; }
+        .tutorial-list { padding-left: var(--space-6); }
+        .tutorial-list li { margin-bottom: var(--space-3); line-height: 1.5; }
+        .tutorial-list ul { margin-top: var(--space-2); padding-left: var(--space-5); list-style-type: disc; }
+        .alert { padding: var(--space-3); border-radius: var(--radius-md); font-size: 0.9rem; }
+        .alert-info { background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.2); }
+        .text-xs { font-size: 0.7rem; }
+        .text-gradient { background: linear-gradient(135deg, #8b80f9 0%, #34d399 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: bold; }
       </style>
     `;
 
@@ -365,9 +415,15 @@ export class SettingsView {
         geminiService.initialize(storageService.getApiKeys(), storageService.getSelectedModel());
         this.app.showToast('Clé API ajoutée!', 'success');
         this.render(); // Re-render to show list
-      } else {
-        this.app.showToast('Cette clé existe déjà ou est invalide.', 'info');
       }
+    });
+
+    // Toggle API Tutorial
+    document.getElementById('toggle-tutorial')?.addEventListener('click', () => {
+      const tutorial = document.getElementById('api-tutorial');
+      const btn = document.getElementById('toggle-tutorial');
+      const isHidden = tutorial.classList.toggle('hide');
+      btn.textContent = isHidden ? "❓ Besoin d'aide ? Voir le tutoriel" : "✖️ Fermer le tutoriel";
     });
 
     // Remove API Key
