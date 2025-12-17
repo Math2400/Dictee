@@ -104,7 +104,7 @@ export class SettingsView {
                     <li>
                         <strong>Comprendre les Quotas (Limites) :</strong>
                         <ul>
-                            <li><strong>Version Gratuite :</strong> Limitée à environ 15 requêtes par minute et 1500 par jour. Vos données peuvent être utilisées par Google pour améliorer leurs modèles.</li>
+                            <li><strong>Version Gratuite :</strong> Limitée à environ 5 requêtes par minute et 20 par jour (limite officielle actuelle). Vos données peuvent être utilisées par Google pour améliorer leurs modèles.</li>
                             <li><strong>Version Payante :</strong> Pas de limite de quota stricte (payé à l'usage) et vos données restent **privées**.</li>
                         </ul>
                     </li>
