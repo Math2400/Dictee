@@ -68,8 +68,8 @@ $btnAction.Add_Click({
     $btnAction.IsEnabled = $false
     Log "Demarrage du processus pour : $targetDir"
     
-    Start-ThreadJob -ScriptBlock {
-        param($path, $repo, $windowObj)
+    Start-Job -ScriptBlock {
+        param($path, $repo)
         
         function LocalLog($m) { Write-Output $m }
         
