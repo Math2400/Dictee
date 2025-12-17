@@ -32,7 +32,7 @@ $LblSub = New-Object System.Windows.Forms.Label
 $LblSub.Text = "Installation et mise a jour automatique"
 $LblSub.ForeColor = [System.Drawing.ColorTranslator]::FromHtml("#8b80f9")
 $LblSub.Font = $FontLabel
-$LblSub.AutoSize = $true
+$LblSub.AutoSize = [bool]1
 $LblSub.Location = New-Object System.Drawing.Point(30, 60)
 $Form.Controls.Add($LblSub)
 
@@ -41,7 +41,7 @@ $LblPath = New-Object System.Windows.Forms.Label
 $LblPath.Text = "Dossier d'installation :"
 $LblPath.ForeColor = [System.Drawing.Color]::White
 $LblPath.Font = $FontLabel
-$LblPath.AutoSize = $true
+$LblPath.AutoSize = [bool]1
 $LblPath.Location = New-Object System.Drawing.Point(30, 110)
 $Form.Controls.Add($LblPath)
 
@@ -77,11 +77,11 @@ $Form.Controls.Add($BtnAction)
 
 # --- Checkbox Raccourci ---
 $ChkShortcut = New-Object System.Windows.Forms.CheckBox
-$ChkShortcut.Text = "Créer un raccourci sur le bureau"
+$ChkShortcut.Text = "Creer un raccourci sur le bureau"
 $ChkShortcut.ForeColor = [System.Drawing.Color]::White
 $ChkShortcut.Location = New-Object System.Drawing.Point(30, 230)
-$ChkShortcut.AutoSize = $true
-$ChkShortcut.Checked = $true
+$ChkShortcut.AutoSize = [bool]1
+$ChkShortcut.Checked = [bool]1
 $Form.Controls.Add($ChkShortcut)
 
 # --- Log Box ---
@@ -181,8 +181,9 @@ $BtnAction.Add_Click({
                     Log "Creation du raccourci sur le bureau..."
                     $desktopPath = [Environment]::GetFolderPath("Desktop")
                     $shortcutPath = Join-Path $desktopPath "Dictee Intelligente.bat"
-                    $launcherPath = Join-Path $targetDir "LANCER_APP.bat"
-                    "@echo off`ncd /d `"$targetDir`"`nstart LANCER_APP.bat" | Out-File $shortcutPath -Encoding ascii
+                    # On utilise TxtPath.Text au lieu de targetDir pour etre sur du scope
+                    $finalPath = $TxtPath.Text
+                    "@echo off`ncd /d `"$finalPath`"`nstart LANCER_APP.bat" | Out-File $shortcutPath -Encoding ascii
                 }
                 
                 Log "Lancement de l'application..."
@@ -190,7 +191,8 @@ $BtnAction.Add_Click({
                 $this.Stop()
                 
                 # Lancement
-                Set-Location $targetDir
+                $finalPath = $TxtPath.Text
+                Set-Location $finalPath
                 Start-Process "cmd.exe" "/c LANCER_APP.bat"
             } elseif ($line -like "ERREUR*") {
                 Log $line
@@ -203,7 +205,5 @@ $BtnAction.Add_Click({
     })
     $Timer.Start()
 })
-
-$Form.ShowDialog() | Out-Null
 
 $Form.ShowDialog() | Out-Null
