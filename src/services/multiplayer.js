@@ -11,6 +11,7 @@ class MultiplayerService {
         this.players = [];
         this.isHost = false;
         this.roomState = 'lobby'; // 'lobby', 'generating', 'ready', 'dictating'
+        this.knownPlayers = new Map(); // Store all players ever seen in this session
         this.onPlayerUpdate = null;
         this.onGameStart = null;
         this.onScoreUpdate = null;
@@ -62,15 +63,32 @@ class MultiplayerService {
             .on('presence', { event: 'sync' }, () => {
                 const newState = this.channel.presenceState();
                 console.log('Realtime Presence Sync:', newState);
-                this.players = Object.entries(newState).map(([key, value]) => {
+
+                // Reset online status for all known players
+                for (let player of this.knownPlayers.values()) {
+                    player.online = false;
+                }
+
+                Object.entries(newState).forEach(([key, value]) => {
                     const presence = value[0];
-                    return {
+                    const playerData = {
                         name: key,
                         is_host: presence.is_host,
                         score: presence.score || 0,
-                        online_at: presence.online_at
+                        online_at: presence.online_at,
+                        online: true
                     };
+
+                    // Update or add to known players
+                    const existing = this.knownPlayers.get(key);
+                    if (existing) {
+                        Object.assign(existing, playerData);
+                    } else {
+                        this.knownPlayers.set(key, playerData);
+                    }
                 });
+
+                this.players = Array.from(this.knownPlayers.values());
 
                 // Sort to keep host first or alphabetical
                 this.players.sort((a, b) => b.is_host - a.is_host || a.name.localeCompare(b.name));
@@ -98,7 +116,43 @@ class MultiplayerService {
             }
         });
 
+        // Sauvegarder la session pour reconnexion
+        this.saveSession();
+
         return true;
+    }
+
+    saveSession() {
+        if (!this.roomCode) return;
+        const session = {
+            roomCode: this.roomCode,
+            playerName: this.playerName,
+            isHost: this.isHost,
+            timestamp: Date.now()
+        };
+        localStorage.setItem('dictee_multiplayer_session', JSON.stringify(session));
+    }
+
+    getPersistedSession() {
+        const sessionStr = localStorage.getItem('dictee_multiplayer_session');
+        if (!sessionStr) return null;
+
+        try {
+            const session = JSON.parse(sessionStr);
+            // Vérifier le timeout de 10 minutes
+            const tenMinutes = 10 * 60 * 1000;
+            if (Date.now() - session.timestamp > tenMinutes) {
+                this.clearPersistedSession();
+                return null;
+            }
+            return session;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    clearPersistedSession() {
+        localStorage.removeItem('dictee_multiplayer_session');
     }
 
     sendRoomState(state, extraData = {}) {
@@ -131,9 +185,11 @@ class MultiplayerService {
     }
 
     updateLocalPlayerScore({ playerName, score }) {
-        const player = this.players.find(p => p.name === playerName);
+        const player = this.knownPlayers.get(playerName);
         if (player) {
             player.score = score;
+            this.players = Array.from(this.knownPlayers.values());
+            this.players.sort((a, b) => b.is_host - a.is_host || a.name.localeCompare(b.name));
             if (this.onScoreUpdate) this.onScoreUpdate(this.players);
         }
     }
@@ -163,6 +219,8 @@ class MultiplayerService {
         }
         this.roomCode = null;
         this.players = [];
+        this.knownPlayers.clear();
+        this.clearPersistedSession();
     }
 }
 

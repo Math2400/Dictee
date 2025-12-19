@@ -107,8 +107,11 @@ export class MultiplayerView {
                         <h3>Joueurs (${this.state.players.length})</h3>
                         <div class="player-list mt-4">
                             ${this.state.players.map(p => `
-                                <div class="player-item flex justify-between items-center p-3 mb-2 glass rounded-lg">
-                                    <span>${p.is_host ? '👑' : '👤'} ${p.name}</span>
+                                <div class="player-item flex justify-between items-center p-3 mb-2 glass rounded-lg ${p.online ? '' : 'opacity-50'}">
+                                    <div class="flex items-center gap-2">
+                                        <span>${p.is_host ? '👑' : '👤'} ${p.name}</span>
+                                        ${p.online ? '<span class="status-dot dot-success" title="En ligne"></span>' : '<span class="status-dot dot-error" title="Déconnecté"></span>'}
+                                    </div>
                                     <span class="badge ${p.score > 0 ? 'badge-success' : 'badge-ghost'}">${p.score} pts</span>
                                 </div>
                             `).join('')}

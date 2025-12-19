@@ -3,6 +3,48 @@
    Reusable UI component styles
    ============================================ */
 
+/* --- Multiplayer Status --- */
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.dot-success {
+    background-color: var(--color-success-400);
+    box-shadow: 0 0 8px var(--color-success-400);
+}
+
+.dot-error {
+    background-color: var(--color-error-400);
+    box-shadow: 0 0 8px var(--color-error-400);
+    animation: status-pulse 2s infinite;
+}
+
+@keyframes status-pulse {
+    0% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.4;
+    }
+
+    100% {
+        opacity: 1;
+    }
+}
+
+.player-progress-item.offline {
+    opacity: 0.5 !important;
+    filter: grayscale(0.5) !important;
+}
+
+.player-progress-item.offline .player-score {
+    color: var(--color-error-400) !important;
+}
+
 /* ===== GLASS CARD ===== */
 .card {
     background: var(--color-surface-glass);

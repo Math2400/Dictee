@@ -348,9 +348,12 @@ export class DictationView {
           <div class="multiplayer-leaderboard card mb-4">
              <div class="leaderboard-grid" id="mini-leaderboard">
                 ${multiplayerService.players.map(p => `
-                   <div class="player-progress-item" data-player="${p.name}">
+                   <div class="player-progress-item ${p.online ? '' : 'offline'}" data-player="${p.name}">
                       <div class="flex justify-between text-xs mb-1">
-                         <span>${p.name === multiplayerService.playerName ? '🍀 Vous' : '👤 ' + p.name}</span>
+                         <span class="flex items-center gap-1">
+                            ${p.name === multiplayerService.playerName ? '🍀 Vous' : '👤 ' + p.name}
+                            ${!p.online ? '⚠️' : ''}
+                         </span>
                          <span class="player-score">${p.score || 0}%</span>
                       </div>
                       <div class="progress-bar-mini">
@@ -816,11 +819,23 @@ export class DictationView {
           if (item) {
             const scoreEl = item.querySelector('.player-score');
             const fillEl = item.querySelector('.progress-fill');
+            const nameEl = item.querySelector('.flex.items-center.gap-1');
+
             if (scoreEl) scoreEl.textContent = `${p.score || 0}%`;
             if (fillEl) fillEl.style.width = `${p.score || 0}%`;
+
+            // Toggle offline status
+            item.classList.toggle('offline', !p.online);
+            if (nameEl) {
+              const name = p.name === multiplayerService.playerName ? '🍀 Vous' : '👤 ' + p.name;
+              nameEl.innerHTML = `${name} ${!p.online ? '⚠️' : ''}`;
+            }
           }
         });
       };
+
+      // Also update on presence change
+      multiplayerService.onPlayerUpdate = multiplayerService.onScoreUpdate;
     }
   }
 
