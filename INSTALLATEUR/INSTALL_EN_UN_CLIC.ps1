@@ -142,14 +142,21 @@ $BtnAction.Add_Click({
 
             Set-Location $path
             if (!(Test-Path ".git")) {
-                LocalLog "Telechargement du projet (Clone)..."
+                LocalLog "Installation initiale (Clone)..."
                 git init | Out-Null
                 git remote add origin $repo | Out-Null
                 git fetch origin | Out-Null
                 git checkout -f master | Out-Null
             } else {
-                LocalLog "Mise a jour du projet (Pull)..."
-                git pull origin master | Out-Null
+                # Verifier si c'est le bon repo
+                $currentRepo = git remote get-url origin 2>$null
+                if ($currentRepo -eq $repo) {
+                    LocalLog "Mise a jour du projet (Pull)..."
+                    git fetch origin | Out-Null
+                    git reset --hard origin/master | Out-Null
+                } else {
+                    return "ERREUR : Le dossier existe deja mais pointe vers un autre depot ($currentRepo)"
+                }
             }
             
             # 5. NPM
@@ -158,7 +165,9 @@ $BtnAction.Add_Click({
             }
             
             LocalLog "Installation des modules npm (cela peut prendre du temps)..."
-            npm install --silent
+            npm install --no-audit --no-fund
+            
+            LocalLog "Finalisation de l'installation..."
             
             return "SUCCES"
         } catch {

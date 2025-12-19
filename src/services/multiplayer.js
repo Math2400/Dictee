@@ -10,9 +10,11 @@ class MultiplayerService {
         this.roomCode = null;
         this.players = [];
         this.isHost = false;
+        this.roomState = 'lobby'; // 'lobby', 'generating', 'ready', 'dictating'
         this.onPlayerUpdate = null;
         this.onGameStart = null;
         this.onScoreUpdate = null;
+        this.onStateUpdate = null;
     }
 
     /**
@@ -26,6 +28,7 @@ class MultiplayerService {
         this.roomCode = roomCode;
         this.playerName = playerName;
         this.isHost = isHost;
+        this.roomState = 'lobby';
 
         // Créer un canal Realtime
         this.channel = cloudService.supabase.channel(`room:${roomCode}`, {
@@ -38,42 +41,71 @@ class MultiplayerService {
         // Écouter les événements
         this.channel
             .on('broadcast', { event: 'game_start' }, ({ payload }) => {
+                this.roomState = 'dictating';
                 if (this.onGameStart) this.onGameStart(payload);
+            })
+            .on('broadcast', { event: 'state_update' }, ({ payload }) => {
+                this.roomState = payload.state;
+                if (this.onStateUpdate) this.onStateUpdate(payload);
             })
             .on('broadcast', { event: 'score_update' }, ({ payload }) => {
                 this.updateLocalPlayerScore(payload);
             })
             .on('presence', { event: 'sync' }, () => {
                 const newState = this.channel.presenceState();
-                this.players = Object.entries(newState).map(([key, value]) => ({
-                    name: key,
-                    ...value[0]
-                }));
+                console.log('Realtime Presence Sync:', newState);
+                this.players = Object.entries(newState).map(([key, value]) => {
+                    const presence = value[0];
+                    return {
+                        name: key,
+                        is_host: presence.is_host,
+                        score: presence.score || 0,
+                        online_at: presence.online_at
+                    };
+                });
+
+                // Sort to keep host first or alphabetical
+                this.players.sort((a, b) => b.is_host - a.is_host || a.name.localeCompare(b.name));
+
                 if (this.onPlayerUpdate) this.onPlayerUpdate(this.players);
             })
             .on('presence', { event: 'join' }, ({ key, newPresences }) => {
-                console.log('Joueur rejoint:', key, newPresences);
+                console.log('Joueur rejoint (Presence):', key, newPresences);
             })
             .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
-                console.log('Joueur parti:', key, leftPresences);
+                console.log('Joueur parti (Presence):', key, leftPresences);
             });
 
         // S'abonner
         await this.channel.subscribe(async (status) => {
+            console.log('Connection status:', status);
             if (status === 'SUBSCRIBED') {
-                await this.channel.track({
+                const presenceData = {
                     online_at: new Date().toISOString(),
                     is_host: isHost,
                     score: 0
-                });
+                };
+                console.log('Tracking presence:', presenceData);
+                await this.channel.track(presenceData);
             }
         });
 
         return true;
     }
 
+    sendRoomState(state, extraData = {}) {
+        if (!this.isHost || !this.channel) return;
+        this.roomState = state;
+        this.channel.send({
+            type: 'broadcast',
+            event: 'state_update',
+            payload: { state, ...extraData }
+        });
+    }
+
     sendGameStart(dictationData) {
         if (!this.isHost || !this.channel) return;
+        this.roomState = 'dictating';
         this.channel.send({
             type: 'broadcast',
             event: 'game_start',

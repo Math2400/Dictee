@@ -122,7 +122,12 @@ class App {
 
             case route === '/dictation':
                 const pendingRedo = storageService.getPendingRedo();
-                if (pendingRedo) {
+                // Priorité absolue au multijoueur actif
+                if (this.state.multiplayerDictation) {
+                    console.log('Routing to Multiplayer Dictation...');
+                    this.currentView = new DictationView(container, this);
+                } else if (pendingRedo) {
+                    console.log('Routing to Redo Dictation...');
                     this.state.currentTheme = pendingRedo.theme || { name: 'Dictée', icon: '📝', id: 'redo' };
                     this.currentView = new DictationView(container, this);
                 } else {

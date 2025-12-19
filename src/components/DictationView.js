@@ -73,8 +73,8 @@ export class DictationView {
         this.setupAudio();
         this.attachEventListeners();
       }, 100);
-      // Clean up from state
-      this.app.setState({ multiplayerDictation: null });
+      // Clean up from state? NO, keep it for re-renders and robustness
+      // this.app.setState({ multiplayerDictation: null }); 
       return;
     }
 
@@ -342,6 +342,31 @@ export class DictationView {
             <span class="tag tag-level">${this.dictation.difficulty || 'B2'}</span>
           </div>
         </header>
+
+        <!-- Multiplayer Leaderboard (Mini) -->
+        ${this.isMultiplayer ? `
+          <div class="multiplayer-leaderboard card mb-4">
+             <div class="leaderboard-grid" id="mini-leaderboard">
+                ${multiplayerService.players.map(p => `
+                   <div class="player-progress-item" data-player="${p.name}">
+                      <div class="flex justify-between text-xs mb-1">
+                         <span>${p.name === multiplayerService.playerName ? '🍀 Vous' : '👤 ' + p.name}</span>
+                         <span class="player-score">${p.score || 0}%</span>
+                      </div>
+                      <div class="progress-bar-mini">
+                         <div class="progress-fill" style="width: ${p.score || 0}%"></div>
+                      </div>
+                   </div>
+                `).join('')}
+             </div>
+          </div>
+          <style>
+             .multiplayer-leaderboard { padding: var(--space-3); background: var(--color-bg-secondary); border: 1px solid var(--color-primary-800); }
+             .leaderboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: var(--space-4); }
+             .progress-bar-mini { height: 4px; background: var(--color-bg-tertiary); border-radius: 2px; overflow: hidden; }
+             .progress-fill { height: 100%; background: var(--color-primary-400); transition: width 0.3s ease; }
+          </style>
+        ` : ''}
 
         <!-- Timer Section -->
         <section class="timer-section">
@@ -649,10 +674,11 @@ export class DictationView {
       const wordCount = this.countWords(textarea.value);
       document.getElementById('word-count').textContent = `${wordCount} mots`;
 
-      // Multiplayer: Send incremental score (placeholder for real progress)
+      // Multiplayer: Send incremental score 
       if (this.isMultiplayer && multiplayerService.channel) {
-        const score = Math.floor((wordCount / this.countWords(this.dictation.text)) * 100);
-        multiplayerService.sendScore(multiplayerService.playerName || 'Anonyme', score);
+        const totalWords = this.countWords(this.dictation.text);
+        const score = totalWords > 0 ? Math.floor((wordCount / totalWords) * 100) : 0;
+        multiplayerService.sendScore(multiplayerService.playerName || 'Anonyme', Math.min(score, 100));
       }
     });
 
@@ -760,6 +786,21 @@ export class DictationView {
         this.submitDictation();
       }
     });
+
+    // Multiplayer: Handle live progress
+    if (this.isMultiplayer) {
+      multiplayerService.onScoreUpdate = (players) => {
+        players.forEach(p => {
+          const item = this.container.querySelector(`.player-progress-item[data-player="${p.name}"]`);
+          if (item) {
+            const scoreEl = item.querySelector('.player-score');
+            const fillEl = item.querySelector('.progress-fill');
+            if (scoreEl) scoreEl.textContent = `${p.score || 0}%`;
+            if (fillEl) fillEl.style.width = `${p.score || 0}%`;
+          }
+        });
+      };
+    }
   }
 
   renderSegmentIndicator() {
@@ -1026,5 +1067,6 @@ export class DictationView {
     audioService.onSegmentChange = null;
     audioService.onPlayStateChange = null;
     audioService.onComplete = null;
+    multiplayerService.onScoreUpdate = null;
   }
 }
