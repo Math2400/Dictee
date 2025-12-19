@@ -29,10 +29,21 @@ export class Dashboard {
             <p class="text-secondary">Améliorez votre maîtrise du français grâce à l'IA</p>
           </div>
           ${!geminiService.isInitialized() ? `
-            <div class="api-warning card" style="border-color: var(--color-warning-500); margin-top: var(--space-4);">
-              <p>⚠️ Clé API Gemini non configurée. <a href="#/settings" class="text-gradient">Configurer maintenant</a></p>
+            <div class="api-warning card animate-pulse mb-6">
+                 <p>⚠️ Clé API Gemini non configurée. <a href="#/settings" class="text-gradient">Configurer maintenant</a></p>
             </div>
           ` : ''}
+          
+          <div class="cloud-status-dashboard mt-2">
+            ${storageService.getCloudSettings().enabled ? `
+              <span class="badge badge-success">☁️ Cloud Actif</span>
+              ${storageService.getCloudSettings().lastSync ? `
+                <span class="text-xs text-muted">Dernière synchro : ${new Date(storageService.getCloudSettings().lastSync).toLocaleTimeString()}</span>
+              ` : ''}
+            ` : `
+              <span class="badge badge-ghost">📡 Local uniquement</span>
+            `}
+          </div>
         </header>
 
         <!-- Quick Actions -->
@@ -48,6 +59,9 @@ export class Dashboard {
           </button>
           <button class="btn btn-secondary btn-lg" id="start-training">
             <span>🧠</span> Entraînement
+          </button>
+          <button class="btn btn-secondary btn-lg" id="goto-multiplayer">
+            <span>🎮</span> Multijoueur
           </button>
         </section>
 
@@ -366,6 +380,10 @@ export class Dashboard {
 
     document.getElementById('start-training')?.addEventListener('click', () => {
       this.app.navigate('/training');
+    });
+
+    document.getElementById('goto-multiplayer')?.addEventListener('click', () => {
+      this.app.navigate('/multiplayer');
     });
 
     // Clickable History Items

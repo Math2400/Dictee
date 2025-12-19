@@ -259,6 +259,73 @@ export class SettingsView {
             <p class="text-sm text-muted mt-4">Cliquez sur "+" pour ajouter une touche, sur "×" pour supprimer.</p>
         </section>
 
+        <!-- Cloud Sync Configuration -->
+        <section class="settings-section card">
+          <h2>☁️ Stockage Cloud (Optionnel)</h2>
+          <p class="text-secondary mb-4">
+            Connectez votre propre compte <strong>Supabase</strong> pour synchroniser vos données entre vos appareils.
+            C'est 100% gratuit et vous gardez le contrôle total de vos données.
+          </p>
+
+          <div class="checkbox-group mb-4">
+            <label class="checkbox-label">
+              <input type="checkbox" id="cloud-enabled" ${storageService.getCloudSettings().enabled ? 'checked' : ''}>
+              <span>Activer la synchronisation Cloud</span>
+            </label>
+          </div>
+
+          <div id="cloud-config-fields" class="${storageService.getCloudSettings().enabled ? '' : 'hide'}">
+            <div class="input-group">
+              <label class="input-label">URL Supabase</label>
+              <input type="text" class="input" id="supabase-url" placeholder="https://xyz.supabase.co" value="${storageService.getCloudSettings().supabaseUrl || ''}">
+            </div>
+
+            <div class="input-group">
+              <label class="input-label">Clé API Supabase (Anon Key)</label>
+              <input type="password" class="input" id="supabase-key" placeholder="votre_anon_key_ici" value="${storageService.getCloudSettings().supabaseKey || ''}">
+            </div>
+
+            <div class="api-status-row">
+                <p class="input-hint">
+                    ${storageService.getCloudSettings().lastSync ? `✓ Dernière synchro : ${new Date(storageService.getCloudSettings().lastSync).toLocaleString()}` : 'ℹ️ Jamais synchronisé'}
+                </p>
+                <button class="btn btn-ghost btn-sm text-gradient" id="toggle-cloud-tutorial">❓ Aide configuration</button>
+            </div>
+            
+            <div class="flex gap-2 mt-4">
+              <button class="btn btn-primary flex-1" id="sync-now">
+                  📤 Envoyer vers le Cloud
+              </button>
+              <button class="btn btn-secondary flex-1" id="download-cloud">
+                  📥 Récupérer du Cloud
+              </button>
+            </div>
+          </div>
+
+          <!-- Cloud Tutorial Section (Hidden by default) -->
+          <div id="cloud-tutorial" class="api-tutorial card glass hide">
+            <div class="tutorial-header">
+                <h3>☁️ Créer votre propre Cloud Gratuit</h3>
+            </div>
+            <div class="tutorial-body">
+                <p>Suivez ces étapes pour obtenir vos propres clés de synchronisation :</p>
+                <ol class="tutorial-list">
+                    <li>Allez sur <a href="https://supabase.com/" target="_blank">Supabase.com</a> et créez un compte gratuit.</li>
+                    <li>Créez un nouveau projet (ex: "Mes Dictées").</li>
+                    <li>Dans les paramètres du projet (roue dentée) -> <strong>API</strong> :</li>
+                    <ul>
+                        <li>Copiez l'<strong>URL</strong> du projet.</li>
+                        <li>Copiez la clé <strong>anon public</strong>.</li>
+                    </ul>
+                    <li>Collez-les ici et activez la synchronisation.</li>
+                </ol>
+                <div class="alert alert-info">
+                    🛡️ <strong>Sécurité :</strong> Vos clés sont stockées localement sur cet appareil. Pour le multijoueur, si vous hébergez, les autres joueurs pourront interagir temporairement avec votre instance via une "salle" sécurisée, mais sans accéder à vos données personnelles.
+                </div>
+            </div>
+          </div>
+        </section>
+
         <!-- Preferences -->
         <section class="settings-section card">
           <h2>⚙️ Préférences</h2>
@@ -525,6 +592,69 @@ export class SettingsView {
 
     document.getElementById('auto-grammar')?.addEventListener('change', (e) => {
       storageService.updateSettings({ autoGrammarAnalysis: e.target.checked });
+    });
+
+    // Cloud Sync Settings
+    document.getElementById('cloud-enabled')?.addEventListener('change', (e) => {
+      const enabled = e.target.checked;
+      storageService.updateCloudSettings({ enabled });
+      document.getElementById('cloud-config-fields')?.classList.toggle('hide', !enabled);
+      this.app.showToast(enabled ? 'Synchronisation activée' : 'Synchronisation désactivée', 'info');
+    });
+
+    document.getElementById('supabase-url')?.addEventListener('input', (e) => {
+      storageService.updateCloudSettings({ supabaseUrl: e.target.value.trim() });
+    });
+
+    document.getElementById('supabase-key')?.addEventListener('input', (e) => {
+      storageService.updateCloudSettings({ supabaseKey: e.target.value.trim() });
+    });
+
+    document.getElementById('toggle-cloud-tutorial')?.addEventListener('click', () => {
+      document.getElementById('cloud-tutorial')?.classList.toggle('hide');
+    });
+
+    document.getElementById('sync-now')?.addEventListener('click', async () => {
+      const btn = document.getElementById('sync-now');
+      const originalText = btn.innerHTML;
+      try {
+        btn.disabled = true;
+        btn.innerHTML = '⏳ Synchronisation...';
+        const result = await storageService.performFullSync();
+        if (result.success) {
+          this.app.showToast('Données envoyées sur votre Supabase !', 'success');
+          this.render();
+        } else {
+          this.app.showToast(`Échec : ${result.message}`, 'error');
+        }
+      } catch (e) {
+        this.app.showToast('Erreur lors de l\'envoi', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+      }
+    });
+
+    document.getElementById('download-cloud')?.addEventListener('click', async () => {
+      if (!confirm('Cela remplacera vos données locales par celles du Cloud. Continuer ?')) return;
+      const btn = document.getElementById('download-cloud');
+      const originalText = btn.innerHTML;
+      try {
+        btn.disabled = true;
+        btn.innerHTML = '⏳ Récupération...';
+        const result = await storageService.downloadFromCloud();
+        if (result.success) {
+          alert('Données récupérées avec succès ! L\'application va redémarrer.');
+          window.location.reload();
+        } else {
+          this.app.showToast(`Échec : ${result.message}`, 'error');
+        }
+      } catch (e) {
+        this.app.showToast('Erreur lors de la récupération', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+      }
     });
 
     // ... (Export/Import/Reset/Back - Unchanged) ...

@@ -6,6 +6,7 @@
 import { geminiService } from '../services/gemini.js';
 import { audioService } from '../services/audio.js';
 import { storageService } from '../services/storage.js';
+import { multiplayerService } from '../services/multiplayer.js';
 import { TIMER_THRESHOLDS, SCORING } from '../utils/constants.js';
 
 export class DictationView {
@@ -60,6 +61,20 @@ export class DictationView {
       }, 100);
 
       storageService.clearPendingRedo();
+      return;
+    }
+
+    // 0.5 Check for Multiplayer Dictation (Passed via state)
+    if (this.app.state.multiplayerDictation) {
+      this.dictation = this.app.state.multiplayerDictation;
+      this.isMultiplayer = true;
+      this.render();
+      setTimeout(() => {
+        this.setupAudio();
+        this.attachEventListeners();
+      }, 100);
+      // Clean up from state
+      this.app.setState({ multiplayerDictation: null });
       return;
     }
 
@@ -633,6 +648,12 @@ export class DictationView {
       // Update word count
       const wordCount = this.countWords(textarea.value);
       document.getElementById('word-count').textContent = `${wordCount} mots`;
+
+      // Multiplayer: Send incremental score (placeholder for real progress)
+      if (this.isMultiplayer && multiplayerService.channel) {
+        const score = Math.floor((wordCount / this.countWords(this.dictation.text)) * 100);
+        multiplayerService.sendScore(multiplayerService.playerName || 'Anonyme', score);
+      }
     });
 
     // Submit

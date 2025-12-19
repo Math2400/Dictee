@@ -1,20 +1,27 @@
 <!DOCTYPE html>
 <html lang="fr">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Système de dictée intelligente avec IA pour améliorer votre maîtrise du français">
   <title>Dictée Intelligente — Maîtrisez le Français</title>
-  
+
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
-  
-  <!-- Styles -->
-  <link rel="stylesheet" href="/src/styles/index.css">
-  <link rel="stylesheet" href="/src/styles/components.css">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&display=swap"
+    rel="stylesheet">
+
+  <!-- PWA & Mobile -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#7c4dff">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
 </head>
+
 <body>
   <div id="app">
     <!-- Navigation -->
@@ -24,10 +31,10 @@
         <span class="brand-text">Dictée Intelligente</span>
       </div>
       <div class="nav-links">
-        <a href="#/" class="nav-link" data-route="dashboard">Tableau de Bord</a>
-        <a href="#/dictation" class="nav-link" data-route="dictation">Dictée</a>
-        <a href="#/vocabulary" class="nav-link" data-route="vocabulary">Vocabulaire</a>
-        <a href="#/settings" class="nav-link" data-route="settings">Paramètres</a>
+        <a href="#/" class="nav-link" data-route="dashboard"><span>🏠</span><span>Tableau de Bord</span></a>
+        <a href="#/dictation" class="nav-link" data-route="dictation"><span>📝</span><span>Dictée</span></a>
+        <a href="#/vocabulary" class="nav-link" data-route="vocabulary"><span>📚</span><span>Vocabulaire</span></a>
+        <a href="#/settings" class="nav-link" data-route="settings"><span>⚙️</span><span>Paramètres</span></a>
       </div>
     </nav>
 
@@ -40,6 +47,7 @@
     <div id="toast-container" class="toast-container"></div>
   </div>
 
-  <script type="module" src="/src/main.js"></script>
+  <script type="module" src="src/main.js"></script>
 </body>
+
 </html>

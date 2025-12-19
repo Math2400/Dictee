@@ -102,7 +102,8 @@ export const ROUTES = {
     QUIZ: '/quiz',
     VOCABULARY: '/vocabulary',
     ERRORS: '/errors',
-    SETTINGS: '/settings'
+    SETTINGS: '/settings',
+    MULTIPLAYER: '/multiplayer'
 };
 
 // Modèles Gemini disponibles

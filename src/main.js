@@ -3,6 +3,9 @@
  * Initializes services and handles routing
  */
 
+import './styles/index.css';
+import './styles/components.css';
+
 import { geminiService } from './services/gemini.js';
 import { storageService } from './services/storage.js';
 import { audioService } from './services/audio.js';
@@ -15,6 +18,7 @@ import { VocabularyManager } from './components/VocabularyManager.js';
 import { ErrorsManager } from './components/ErrorsManager.js';
 import { TrainingView } from './components/TrainingView.js';
 import { SettingsView } from './components/SettingsView.js';
+import { MultiplayerView } from './components/MultiplayerView.js';
 import { ROUTES } from './utils/constants.js';
 
 class App {
@@ -58,6 +62,19 @@ class App {
         const newAchievements = storageService.checkAchievements();
         if (newAchievements.length > 0) {
             newAchievements.forEach(a => this.showToast(`🏆 Nouvelle médaille : ${a.name}!`, 'success'));
+        }
+
+        // Enregistrer le Service Worker pour le mode PWA
+        this.registerServiceWorker();
+    }
+
+    registerServiceWorker() {
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(reg => console.log('Service Worker enregistré !', reg.scope))
+                    .catch(err => console.warn('Échec enregistrement SW:', err));
+            });
         }
     }
 
@@ -149,6 +166,10 @@ class App {
 
             case route === '/training':
                 this.currentView = new TrainingView(container, this);
+                break;
+
+            case route === '/multiplayer':
+                this.currentView = new MultiplayerView(container, this);
                 break;
 
             default:

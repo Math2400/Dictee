@@ -1,7 +1,5 @@
-/**
- * Storage Service - Persistance localStorage
- * Gère toutes les données utilisateur avec schéma structuré
- */
+import { audioService } from './audio.js';
+import { cloudService } from './cloud.js';
 
 const STORAGE_KEYS = {
     USER_PROFILE: 'dictee_user_profile',
@@ -10,7 +8,7 @@ const STORAGE_KEYS = {
     VOCABULARY: 'dictee_vocabulary',
     ACHIEVEMENTS: 'dictee_achievements',
     SETTINGS: 'dictee_settings',
-    SETTINGS: 'dictee_settings',
+    CLOUD_SETTINGS: 'dictee_cloud_settings',
     HISTORY: 'dictee_history',
     DRAFTS: 'dictee_drafts'
 };
@@ -95,6 +93,7 @@ const EXTRA_VOCABULARY = [
 
 // Schéma par défaut pour un nouveau profil
 const DEFAULT_USER_PROFILE = {
+    id: 'user_profile_main', // Fixed ID for Supabase upsert
     level: 'B2',
     totalPoints: 0,
     totalDictations: 0,
@@ -240,6 +239,7 @@ const ACHIEVEMENTS_CONFIG = [
 
 class StorageService {
     constructor() {
+        this.isSyncing = false; // Prevent sync loops
         this.init();
     }
 
@@ -253,6 +253,10 @@ class StorageService {
         if (!this.getThemes()) {
             this.setThemes(DEFAULT_THEMES);
         }
+
+        // Initialiser le Cloud Service au démarrage si activé
+        this.initCloud();
+
         if (!this.getErrors()) {
             this.setErrors([]);
         }
@@ -282,6 +286,14 @@ class StorageService {
         }
         if (!this.getHistory()) {
             this.setHistory([]);
+        }
+        if (!this.getCloudSettings()) {
+            this.setCloudSettings({
+                enabled: false,
+                supabaseUrl: '',
+                supabaseKey: '',
+                lastSync: null
+            });
         }
 
         // Injecter le vocabulaire supplémentaire
@@ -331,6 +343,12 @@ class StorageService {
     set(key, value) {
         try {
             localStorage.setItem(key, JSON.stringify(value));
+
+            // Trigger cloud sync if relevant and enabled
+            if (!this.isSyncing) {
+                this.triggerAutoSync(key, value);
+            }
+
             return true;
         } catch (e) {
             console.error(`Erreur écriture ${key}:`, e);
@@ -338,10 +356,212 @@ class StorageService {
         }
     }
 
+    // ===== CLOUD SYNC LOGIC =====
+
+    initCloud(forceUrl = null, forceKey = null) {
+        const settings = this.getCloudSettings();
+        const url = forceUrl || settings?.supabaseUrl;
+        const key = forceKey || settings?.supabaseKey;
+
+        // On initialise si on a les clés, même si pas "enabled" (pour le test de connexion)
+        if (url && key) {
+            cloudService.initialize(url, key);
+        }
+    }
+
+    async triggerAutoSync(key, value) {
+        const settings = this.getCloudSettings();
+        if (!settings?.enabled || !cloudService.enabled) return;
+
+        // Map storage keys to Supabase tables
+        const tableMap = {
+            [STORAGE_KEYS.USER_PROFILE]: 'profiles',
+            [STORAGE_KEYS.VOCABULARY]: 'vocabulary',
+            [STORAGE_KEYS.ERRORS]: 'errors',
+            [STORAGE_KEYS.HISTORY]: 'history',
+            [STORAGE_KEYS.ACHIEVEMENTS]: 'achievements',
+            [STORAGE_KEYS.THEMES]: 'themes'
+        };
+
+        const tableName = tableMap[key];
+        if (tableName) {
+            let dataToSync = Array.isArray(value) ? value : [value];
+
+            // Special handling for Achievements (simple ID list -> objects)
+            if (key === STORAGE_KEYS.ACHIEVEMENTS) {
+                dataToSync = value.map(id => ({ id }));
+            }
+
+            // Standardize and flatten SRS data for vocabulary and errors
+            if (key === STORAGE_KEYS.VOCABULARY || key === STORAGE_KEYS.ERRORS) {
+                dataToSync = dataToSync.map(item => this.flattenSRS(item));
+            }
+
+            const result = await cloudService.syncData(tableName, dataToSync);
+
+            if (result.success) {
+                this.updateCloudSettings({ lastSync: new Date().toISOString() });
+            } else {
+                console.error(`❌ Auto-sync failed for ${tableName}:`, result.message);
+            }
+        }
+    }
+
+    async performFullSync() {
+        const settings = this.getCloudSettings();
+        if (!settings?.enabled) return { success: false, message: 'Cloud non activé' };
+
+        this.initCloud();
+        if (!cloudService.enabled) return { success: false, message: 'Échec connexion Cloud' };
+
+        this.isSyncing = true; // Prevent auto-sync during full sync
+        const errorsList = [];
+        try {
+            // Push all collection
+            const collections = [
+                { key: STORAGE_KEYS.USER_PROFILE, table: 'profiles', isSingle: true },
+                { key: STORAGE_KEYS.VOCABULARY, table: 'vocabulary', hasSRS: true },
+                { key: STORAGE_KEYS.ERRORS, table: 'errors', hasSRS: true },
+                { key: STORAGE_KEYS.HISTORY, table: 'history' },
+                { key: STORAGE_KEYS.ACHIEVEMENTS, table: 'achievements' },
+                { key: STORAGE_KEYS.THEMES, table: 'themes' }
+            ];
+
+            for (const col of collections) {
+                const localData = this.get(col.key);
+                if (localData) {
+                    let data = Array.isArray(localData) ? localData : [localData];
+
+                    if (col.key === STORAGE_KEYS.ACHIEVEMENTS) {
+                        data = data.map(id => ({ id }));
+                    } else if (col.hasSRS) {
+                        data = data.map(item => this.flattenSRS(item));
+                    }
+
+                    const result = await cloudService.syncData(col.table, data);
+                    if (!result.success) {
+                        errorsList.push(`${col.table}: ${result.message}`);
+                    }
+                }
+            }
+
+            if (errorsList.length > 0) {
+                const detailedError = errorsList.join('\n');
+                return {
+                    success: false,
+                    message: `Échec : Certaines tables ont échoué:\n${detailedError}\n\n💡 Solution : Exécutez le script supabase_setup.sql dans votre console Supabase.`
+                };
+            }
+
+            this.updateCloudSettings({ lastSync: new Date().toISOString() });
+            return { success: true };
+        } catch (e) {
+            let msg = e.message;
+            if (msg === 'Failed to fetch' || e.name === 'TypeError') {
+                msg = "Échec réseau : Impossible de contacter Supabase. Vérifiez votre URL Supabase (format https://xyz.supabase.co) et votre connexion internet.";
+            }
+            return { success: false, message: msg };
+        } finally {
+            this.isSyncing = false;
+        }
+    }
+
+    /**
+     * Récupère toutes les données depuis le Cloud (Supabase -> Local)
+     */
+    async downloadFromCloud() {
+        const settings = this.getCloudSettings();
+        if (!settings?.enabled) return { success: false, message: 'Cloud non activé dans les réglages' };
+
+        this.initCloud();
+        if (!cloudService.enabled) return { success: false, message: 'Échec connexion Cloud (vérifiez vos clés)' };
+
+        this.isSyncing = true; // Block auto-upload during download
+        try {
+            const collections = [
+                { key: STORAGE_KEYS.USER_PROFILE, table: 'profiles', isSingle: true },
+                { key: STORAGE_KEYS.VOCABULARY, table: 'vocabulary', hasSRS: true },
+                { key: STORAGE_KEYS.ERRORS, table: 'errors', hasSRS: true },
+                { key: STORAGE_KEYS.HISTORY, table: 'history' },
+                { key: STORAGE_KEYS.ACHIEVEMENTS, table: 'achievements' },
+                { key: STORAGE_KEYS.THEMES, table: 'themes' }
+            ];
+
+            for (const col of collections) {
+                console.log(`☁️ Téléchargement : ${col.table}...`);
+                const result = await cloudService.fetchData(col.table);
+
+                if (result.success && result.data.length > 0) {
+                    const cloudData = result.data;
+                    console.log(`✅ ${cloudData.length} éléments reçus pour ${col.table}`);
+                    if (col.isSingle) {
+                        this.set(col.key, cloudData[0]);
+                    } else if (col.key === STORAGE_KEYS.ACHIEVEMENTS) {
+                        const idList = cloudData.map(row => row.id);
+                        this.set(col.key, idList);
+                    } else {
+                        let finalData = cloudData;
+                        if (col.hasSRS) {
+                            finalData = cloudData.map(item => this.unflattenSRS(item));
+                        }
+                        this.set(col.key, finalData);
+                    }
+                } else {
+                    console.warn(`📩 Aucune donnée trouvée pour ${col.table}`);
+                }
+            }
+            this.updateCloudSettings({ lastSync: new Date().toISOString() });
+            return { success: true };
+        } catch (e) {
+            let msg = e.message;
+            if (msg === 'Failed to fetch' || e.name === 'TypeError') {
+                msg = "Échec réseau : Impossible de contacter Supabase. Vérifiez votre URL Supabase (format https://xyz.supabase.co) et votre connexion internet.";
+            }
+            return { success: false, message: msg };
+        } finally {
+            this.isSyncing = false;
+        }
+    }
+
+    // Helper to flatten SRS data for easier DB management
+    flattenSRS(item) {
+        if (!item.srsData) return item;
+        const newItem = { ...item };
+        newItem.interval = item.srsData.interval || 0;
+        newItem.nextReview = item.srsData.nextReview;
+        newItem.easiness = item.srsData.easeFactor || 2.5;
+        newItem.repetitions = item.srsData.repetitions || 0;
+        delete newItem.srsData;
+        return newItem;
+    }
+
+    // Helper to unflatten SRS data when coming back from DB
+    unflattenSRS(item) {
+        const newItem = { ...item };
+        newItem.srsData = {
+            interval: item.interval || 0,
+            nextReview: item.nextReview,
+            easeFactor: item.easiness || 2.5,
+            repetitions: item.repetitions || 0
+        };
+        delete newItem.interval;
+        delete newItem.nextReview;
+        delete newItem.easiness;
+        delete newItem.repetitions;
+        return newItem;
+    }
+
     // ===== USER PROFILE =====
 
     getUserProfile() {
-        return this.get(STORAGE_KEYS.USER_PROFILE);
+        let profile = this.get(STORAGE_KEYS.USER_PROFILE);
+        if (!profile) {
+            profile = { ...DEFAULT_USER_PROFILE };
+        }
+        if (!profile.id) {
+            profile.id = 'user_profile_main'; // Migration for existing local profiles
+        }
+        return profile;
     }
 
     setUserProfile(profile) {
@@ -705,6 +925,21 @@ class StorageService {
 
     clearPendingRedo() {
         localStorage.removeItem('pending_redo_dictation');
+    }
+
+    // ===== CLOUD SETTINGS =====
+
+    getCloudSettings() {
+        return this.get(STORAGE_KEYS.CLOUD_SETTINGS);
+    }
+
+    setCloudSettings(settings) {
+        return this.set(STORAGE_KEYS.CLOUD_SETTINGS, settings);
+    }
+
+    updateCloudSettings(updates) {
+        const settings = this.getCloudSettings() || {};
+        return this.setCloudSettings({ ...settings, ...updates });
     }
 
     // ===== VOCABULARY =====
