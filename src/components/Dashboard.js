@@ -163,7 +163,7 @@ export class Dashboard {
               ${this.stats.recentHistory.map(h => `
                 <div class="history-item card clickable" data-history-id="${h.id}">
                   <div class="history-info">
-                    <span class="history-theme">${h.themeName || 'Dictée'}</span>
+                    <span class="history-theme">${h.themeName || 'Dictée'} ${h.multiplayer ? '🎮' : ''}</span>
                     <span class="history-date">${new Date(h.date).toLocaleDateString('fr-FR')}</span>
                   </div>
                   <div class="history-score">
@@ -407,7 +407,9 @@ export class Dashboard {
               speedMultiplier: 1, // Pas pertinent en review
               points: entry.points,
               isPerfect: entry.isPerfect,
-              isFailed: entry.isFailed
+              isFailed: entry.isFailed,
+              multiplayer: entry.multiplayer,
+              historyId: entry.id
             }
           });
           this.app.navigate('/correction');

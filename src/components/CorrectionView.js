@@ -15,18 +15,19 @@ export class CorrectionView {
     this.grammarAnalysis = null;
     this.mnemonics = {};
     this.etymologies = {};
-    this.multiplayerResults = [];
-    this.isMultiplayer = !!app.state.multiplayerDictation;
+    this.isMultiplayer = !!app.state.multiplayerDictation || !!this.data.multiplayer;
+    this.isLive = !!app.state.multiplayerDictation;
+    this.multiplayerResults = this.data.multiplayer?.results || [];
     this.playAgainVotes = new Set();
 
     this.render();
-    this.setupMultiplayerListeners();
+    if (this.isLive) {
+      this.setupMultiplayerListeners();
+    }
     this.loadEnhancements();
   }
 
   setupMultiplayerListeners() {
-    if (!this.isMultiplayer) return;
-
     multiplayerService.onResultsUpdate = (payload) => {
       console.log('Results update received:', payload);
       const existing = this.multiplayerResults.find(r => r.playerName === payload.playerName);
@@ -36,22 +37,29 @@ export class CorrectionView {
         this.multiplayerResults.push(payload);
       }
       this.updateMultiplayerUI();
+      this.saveMultiplayerResultsToHistory();
     };
 
     multiplayerService.onPlayAgainRequest = (payload) => {
       this.playAgainVotes.add(payload.playerName);
       this.updateMultiplayerUI();
 
-      // If host and everyone voted (or just someone else), or predefined logic
-      // For now: if host says play again, everyone goes back to multiplayer view
       if (payload.isHost) {
         this.app.showToast(`${payload.playerName} souhaite rejouer !`, 'info');
-        // If host triggers it, we might want to redirect everyone
-        // But let's look for a manual click first or shared state
       }
-
-      // If HOST and client is ready, host can click 'Lancer une nouvelle'
     };
+  }
+
+  saveMultiplayerResultsToHistory() {
+    if (!this.data?.historyId || !this.isLive) return;
+
+    storageService.updateHistoryItem(this.data.historyId, {
+      multiplayer: {
+        roomCode: multiplayerService.roomCode,
+        players: (this.isLive && multiplayerService.players.length > 0) ? multiplayerService.players : (this.data.multiplayer?.players || []),
+        results: this.multiplayerResults
+      }
+    });
   }
 
   updateMultiplayerUI() {
@@ -485,7 +493,10 @@ export class CorrectionView {
   }
 
   renderMultiplayerResults() {
-    const players = multiplayerService.players;
+    const players = this.isLive && multiplayerService.players.length > 0
+      ? multiplayerService.players
+      : (this.data.multiplayer?.players || []);
+
     return `
       <div class="multiplayer-card">
         <h3>📊 Résultats de la partie</h3>

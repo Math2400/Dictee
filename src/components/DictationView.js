@@ -1052,7 +1052,12 @@ export class DictationView {
         analysis: { ...analysis, errors, correctWords, score: analysisScore },
         dictation: this.dictation,
         isPerfect,
-        isFailed
+        isFailed,
+        multiplayer: this.isMultiplayer ? {
+          roomCode: multiplayerService.roomCode,
+          players: multiplayerService.players,
+          results: [] // Will be populated in CorrectionView
+        } : null
       });
 
       // Pass historyId to CorrectionView so it can update the item later (e.g. adding grammar analysis)
