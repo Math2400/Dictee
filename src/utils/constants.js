@@ -89,10 +89,11 @@ export const TIMER_THRESHOLDS = {
 };
 
 export const KEYBOARD_SHORTCUTS = {
-    PLAY_PAUSE: { key: 'Space', label: 'Espace', description: 'Lecture / Pause' },
-    PREVIOUS: { key: 'ArrowLeft', label: '←', description: 'Segment précédent' },
-    NEXT: { key: 'ArrowRight', label: '→', description: 'Segment suivant' },
-    SUBMIT: { key: 'Enter', label: 'Entrée', description: 'Valider (avec Ctrl)' }
+    PLAY_PAUSE: { key: 'AltLeft', label: 'Alt', description: 'Lecture / Pause' },
+    PREVIOUS: { key: 'Tab', shift: true, label: 'Shift + Tab', description: 'Segment précédent' },
+    NEXT: { key: 'Tab', label: 'Tab', description: 'Segment suivant' },
+    REPLAY: { key: 'ControlLeft', label: 'Ctrl', description: 'Répéter' },
+    SUBMIT: { key: 'Enter', ctrl: true, label: 'Entrée', description: 'Valider (avec Ctrl)' }
 };
 
 export const ROUTES = {

@@ -733,23 +733,44 @@ export class DictationView {
 
     // Keyboard shortcuts in textarea based on settings
     const handleKeyChange = (e, isDown) => {
+      // Use code for cross-layout consistency
+      const code = e.code;
+
       if (isDown) {
-        this.pressedKeys.add(e.code);
+        this.pressedKeys.add(code);
       } else {
-        this.pressedKeys.delete(e.code);
+        this.pressedKeys.delete(code);
       }
 
       if (!isDown) return; // Only trigger on keydown
 
       const settings = this.settings || storageService.getSettings();
-      const keyBindings = settings.keyBindings || {};
+      const defaultBindings = {
+        PLAY_PAUSE: ['AltLeft', 'AltRight'],
+        PREVIOUS: ['Tab', 'ShiftLeft'], // Simple version, or check modifiers
+        NEXT: ['Tab'],
+        REPLAY: ['ControlLeft', 'ControlRight']
+      };
+
+      const keyBindings = settings.keyBindings || defaultBindings;
 
       const matches = (action) => {
         const keys = keyBindings[action];
+        if (!keys) return false;
         const requiredKeys = Array.isArray(keys) ? keys : [keys];
         if (requiredKeys.length === 0) return false;
-        // Check if ALL required keys are currently pressed
-        return requiredKeys.every(k => this.pressedKeys.has(k));
+
+        // Special handling for Tab vs Shift+Tab
+        if (action === 'NEXT' && code === 'Tab' && e.shiftKey) return false;
+        if (action === 'PREVIOUS' && code === 'Tab' && !e.shiftKey) return false;
+
+        // For NEXT/PREVIOUS with Tab, we just check the code and shiftKey
+        if ((action === 'NEXT' || action === 'PREVIOUS') && code === 'Tab') {
+          return true;
+        }
+
+        // For other actions, check if ANY of the mapped keys are pressed
+        return requiredKeys.some(k => this.pressedKeys.has(k) || code === k);
       };
 
       let handled = false;
@@ -1052,6 +1073,16 @@ export class DictationView {
       });
 
       this.app.hideLoading();
+
+      // Multiplayer: Broadcast full results
+      if (this.isMultiplayer) {
+        multiplayerService.sendResults({
+          score: analysisScore,
+          errorCount: errors.length,
+          errorTypes: [...new Set(errors.map(e => e.type))]
+        });
+      }
+
       this.app.navigate('/correction');
 
     } catch (error) {

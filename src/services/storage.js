@@ -277,10 +277,10 @@ class StorageService {
                 postDictationQuestionCount: 3, // Default: 3 questions after dictation
                 autoGrammarAnalysis: true, // Default: Enable auto grammar analysis
                 keyBindings: {
-                    PLAY_PAUSE: ['Space'],
-                    PREVIOUS: ['ArrowLeft'],
-                    NEXT: ['ArrowRight'],
-                    REPLAY: ['ControlRight']
+                    PLAY_PAUSE: ['AltLeft', 'AltRight'],
+                    PREVIOUS: ['Tab'],
+                    NEXT: ['Tab'],
+                    REPLAY: ['ControlLeft', 'ControlRight']
                 }
             });
         }

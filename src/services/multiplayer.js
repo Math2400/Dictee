@@ -15,6 +15,8 @@ class MultiplayerService {
         this.onGameStart = null;
         this.onScoreUpdate = null;
         this.onStateUpdate = null;
+        this.onResultsUpdate = null;
+        this.onPlayAgainRequest = null;
     }
 
     /**
@@ -50,6 +52,12 @@ class MultiplayerService {
             })
             .on('broadcast', { event: 'score_update' }, ({ payload }) => {
                 this.updateLocalPlayerScore(payload);
+            })
+            .on('broadcast', { event: 'results_update' }, ({ payload }) => {
+                if (this.onResultsUpdate) this.onResultsUpdate(payload);
+            })
+            .on('broadcast', { event: 'play_again' }, ({ payload }) => {
+                if (this.onPlayAgainRequest) this.onPlayAgainRequest(payload);
             })
             .on('presence', { event: 'sync' }, () => {
                 const newState = this.channel.presenceState();
@@ -128,6 +136,24 @@ class MultiplayerService {
             player.score = score;
             if (this.onScoreUpdate) this.onScoreUpdate(this.players);
         }
+    }
+
+    sendResults(results) {
+        if (!this.channel) return;
+        this.channel.send({
+            type: 'broadcast',
+            event: 'results_update',
+            payload: { playerName: this.playerName, ...results }
+        });
+    }
+
+    requestPlayAgain() {
+        if (!this.channel) return;
+        this.channel.send({
+            type: 'broadcast',
+            event: 'play_again',
+            payload: { playerName: this.playerName, isHost: this.isHost }
+        });
     }
 
     leaveRoom() {

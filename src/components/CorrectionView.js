@@ -15,9 +15,51 @@ export class CorrectionView {
     this.grammarAnalysis = null;
     this.mnemonics = {};
     this.etymologies = {};
+    this.multiplayerResults = [];
+    this.isMultiplayer = !!app.state.multiplayerDictation;
+    this.playAgainVotes = new Set();
 
     this.render();
+    this.setupMultiplayerListeners();
     this.loadEnhancements();
+  }
+
+  setupMultiplayerListeners() {
+    if (!this.isMultiplayer) return;
+
+    multiplayerService.onResultsUpdate = (payload) => {
+      console.log('Results update received:', payload);
+      const existing = this.multiplayerResults.find(r => r.playerName === payload.playerName);
+      if (existing) {
+        Object.assign(existing, payload);
+      } else {
+        this.multiplayerResults.push(payload);
+      }
+      this.updateMultiplayerUI();
+    };
+
+    multiplayerService.onPlayAgainRequest = (payload) => {
+      this.playAgainVotes.add(payload.playerName);
+      this.updateMultiplayerUI();
+
+      // If host and everyone voted (or just someone else), or predefined logic
+      // For now: if host says play again, everyone goes back to multiplayer view
+      if (payload.isHost) {
+        this.app.showToast(`${payload.playerName} souhaite rejouer !`, 'info');
+        // If host triggers it, we might want to redirect everyone
+        // But let's look for a manual click first or shared state
+      }
+
+      // If HOST and client is ready, host can click 'Lancer une nouvelle'
+    };
+  }
+
+  updateMultiplayerUI() {
+    const container = document.getElementById('multiplayer-results-container');
+    if (container) {
+      container.innerHTML = this.renderMultiplayerResults();
+      this.attachPlayAgainListener();
+    }
   }
 
   formatTime(seconds) {
@@ -39,6 +81,13 @@ export class CorrectionView {
 
     this.container.innerHTML = `
       <div class="correction-view animate-fadeIn">
+        <!-- Multiplayer Results (if applicable) -->
+        ${this.isMultiplayer ? `
+          <section id="multiplayer-results-container" class="multiplayer-results-section">
+            ${this.renderMultiplayerResults()}
+          </section>
+        ` : ''}
+
         <!-- Score Header -->
         <header class="score-header card ${isFailed ? 'failed' : ''}">
           <div class="score-display">
@@ -179,12 +228,18 @@ export class CorrectionView {
 
         <!-- Actions -->
         <section class="actions-section">
-          <button class="btn btn-primary btn-lg" id="preload-questions">
-            ⚡ Précharger les questions
-          </button>
-          <button class="btn btn-primary btn-lg" id="continue-quiz">
-            Continuer vers les Questions →
-          </button>
+          ${this.isMultiplayer ? `
+             <button class="btn btn-primary btn-lg" id="btn-play-again">
+                🎮 Rejouer ensemble ${this.playAgainVotes.size > 0 ? `(${this.playAgainVotes.size})` : ''}
+             </button>
+          ` : `
+             <button class="btn btn-primary btn-lg" id="preload-questions">
+                ⚡ Précharger les questions
+             </button>
+             <button class="btn btn-primary btn-lg" id="continue-quiz">
+                Continuer vers les Questions →
+             </button>
+          `}
           <button class="btn btn-secondary" id="back-dashboard">
             Retour au tableau de bord
           </button>
@@ -192,6 +247,38 @@ export class CorrectionView {
       </div>
 
       <style>
+        .multiplayer-results-section {
+          margin-bottom: var(--space-4);
+        }
+        .multiplayer-card {
+          background: var(--color-bg-secondary);
+          border: 1px solid var(--color-primary-800);
+          padding: var(--space-4);
+          border-radius: var(--radius-lg);
+        }
+        .results-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          gap: var(--space-4);
+          margin-top: var(--space-3);
+        }
+        .player-result-card {
+          padding: var(--space-3);
+          background: var(--color-bg-tertiary);
+          border-radius: var(--radius-md);
+          border-left: 3px solid var(--color-primary-500);
+        }
+        .player-result-card.waiting {
+          opacity: 0.7;
+          border-left-color: var(--color-text-muted);
+        }
+        .result-stats {
+          display: flex;
+          gap: var(--space-3);
+          font-size: var(--text-xs);
+          margin-top: var(--space-2);
+          color: var(--color-text-secondary);
+        }
         .correction-view {
           max-width: 1000px;
           margin: 0 auto;
@@ -395,6 +482,67 @@ export class CorrectionView {
     });
 
     return result;
+  }
+
+  renderMultiplayerResults() {
+    const players = multiplayerService.players;
+    return `
+      <div class="multiplayer-card">
+        <h3>📊 Résultats de la partie</h3>
+        <div class="results-grid">
+          ${players.map(p => {
+      const res = this.multiplayerResults.find(r => r.playerName === p.name);
+      const isSelf = p.name === multiplayerService.playerName;
+
+      // If self, use current data
+      const displayScore = isSelf ? this.data.analysis.score : (res ? res.score : null);
+      const displayErrors = isSelf ? this.data.analysis.errors.length : (res ? res.errorCount : null);
+
+      return `
+              <div class="player-result-card ${!res && !isSelf ? 'waiting' : ''}">
+                <div class="flex justify-between items-center">
+                  <strong>${isSelf ? '🍀 Vous' : '👤 ' + p.name}</strong>
+                  <span class="text-lg font-bold">${displayScore !== null ? displayScore + '%' : '...'}</span>
+                </div>
+                ${displayScore !== null ? `
+                  <div class="result-stats">
+                    <span>❌ ${displayErrors} erreur${displayErrors > 1 ? 's' : ''}</span>
+                    ${res?.errorTypes ? `
+                       <span class="text-xs opacity-75">${res.errorTypes.map(t => ERROR_TYPES[t]?.icon || '').join(' ')}</span>
+                    ` : ''}
+                  </div>
+                ` : `
+                  <div class="text-xs italic mt-2 opacity-50">En cours de correction...</div>
+                `}
+              </div>
+            `;
+    }).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  attachPlayAgainListener() {
+    document.getElementById('btn-play-again')?.addEventListener('click', () => {
+      const btn = document.getElementById('btn-play-again');
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = '⏱️ Attente des autres...';
+      }
+      multiplayerService.requestPlayAgain();
+
+      // If host clicks or second player clicks, we take them back to lobby
+      // or if everyone voted. 
+      // For simplicity: If host requests play again, guests see notification.
+      // If everyone is on this screen, they can all click.
+      if (multiplayerService.isHost) {
+        // Broadcast a state update to lobby after 2 seconds to give time to see results
+        setTimeout(() => {
+          multiplayerService.sendRoomState('lobby');
+          this.app.navigate('/multiplayer');
+        }, 1500);
+      }
+    });
   }
 
   escapeRegex(string) {
@@ -740,6 +888,18 @@ export class CorrectionView {
     document.getElementById('back-dashboard')?.addEventListener('click', () => {
       this.app.navigate('/');
     });
+
+    this.attachPlayAgainListener();
+
+    // Listen for room state changes (e.g. host going back to lobby)
+    if (this.isMultiplayer) {
+      multiplayerService.onStateUpdate = (payload) => {
+        if (payload.state === 'lobby') {
+          this.app.showToast('Retour au lobby...', 'info');
+          this.app.navigate('/multiplayer');
+        }
+      };
+    }
   }
 
   destroy() {

@@ -11,12 +11,18 @@ export class MultiplayerView {
     constructor(container, app) {
         this.container = container;
         this.app = app;
+
+        const inActiveRoom = !!multiplayerService.roomCode;
+
         this.state = {
-            view: 'lobby', // 'lobby' or 'room'
-            playerName: storageService.getSettings().playerName || `Joueur_${Math.floor(Math.random() * 1000)}`,
-            roomCode: '',
-            players: []
+            view: inActiveRoom ? 'room' : 'lobby',
+            playerName: multiplayerService.playerName || storageService.getSettings().playerName || `Joueur_${Math.floor(Math.random() * 1000)}`,
+            roomCode: multiplayerService.roomCode || '',
+            players: multiplayerService.players || [],
+            pendingDictation: null
         };
+
+        this.setupServiceListeners();
         this.render();
     }
 
