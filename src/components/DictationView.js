@@ -65,9 +65,20 @@ export class DictationView {
     }
 
     // 0.5 Check for Multiplayer Dictation (Passed via state)
+    this.isMultiplayer = !!this.app.state.multiplayerDictation;
+    this.dictation = this.app.state.multiplayerDictation || this.app.state.currentDictation;
+    this.theme = this.app.state.currentTheme || { name: 'Dictée', icon: '📝' };
+
+    if (this.isMultiplayer) {
+      multiplayerService.saveSession({
+        activeDictation: this.dictation,
+        activeTheme: this.theme
+      });
+    }
+
     if (this.app.state.multiplayerDictation) {
-      this.dictation = this.app.state.multiplayerDictation;
-      this.isMultiplayer = true;
+      // this.dictation = this.app.state.multiplayerDictation; // Already set above
+      // this.isMultiplayer = true; // Already set above
       this.render();
       setTimeout(() => {
         this.setupAudio();
@@ -1108,7 +1119,10 @@ export class DictationView {
     } catch (error) {
       console.error('Erreur analyse COMPLETE:', error);
       this.app.hideLoading();
-      this.app.showToast(`Erreur: ${error.message}`, 'error');
+      this.app.showToast(`Erreur analyse : ${error.message || 'Problème IA'}`, 'error', {
+        label: 'Réessayer',
+        callback: () => this.submitDictation()
+      });
     }
   }
 

@@ -298,7 +298,11 @@ export class MultiplayerView {
             multiplayerService.sendRoomState('ready');
             this.renderRoom();
         } catch (e) {
-            this.app.showToast('Erreur génération : ' + e.message, 'error');
+            console.error('Erreur génération multijoueur:', e);
+            this.app.showToast('Erreur génération : ' + (e.message || 'Problème IA'), 'error', {
+                label: 'Réessayer',
+                callback: () => this.handleGenerate()
+            });
             multiplayerService.sendRoomState('lobby');
             this.renderRoom();
         }
@@ -322,6 +326,13 @@ export class MultiplayerView {
 
         multiplayerService.onGameStart = (payload) => {
             this.app.showToast('L\'hôte a lancé la dictée !', 'success');
+
+            // Sauvegarder dans la session pour reconnexion
+            multiplayerService.saveSession({
+                activeDictation: payload.dictation,
+                activeTheme: payload.theme
+            });
+
             this.app.setState({
                 currentTheme: payload.theme,
                 multiplayerDictation: payload.dictation

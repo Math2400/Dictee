@@ -222,7 +222,10 @@ export class TrainingView {
 
       } catch (e) {
         console.error(e);
-        this.app.showToast('Erreur lors de la création du quiz.', 'error');
+        this.app.showToast('Erreur lors de la création du quiz : ' + (e.message || 'Problème IA'), 'error', {
+          label: 'Réessayer',
+          callback: () => this.handleTrainingSelection(type)
+        });
       } finally {
         this.hideLoading();
       }

@@ -122,13 +122,16 @@ class MultiplayerService {
         return true;
     }
 
-    saveSession() {
+    saveSession(extraData = {}) {
         if (!this.roomCode) return;
+        const existing = this.getPersistedSession() || {};
         const session = {
             roomCode: this.roomCode,
             playerName: this.playerName,
             isHost: this.isHost,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            ...existing,
+            ...extraData
         };
         localStorage.setItem('dictee_multiplayer_session', JSON.stringify(session));
     }

@@ -193,17 +193,40 @@ class App {
         this.state = { ...this.state, ...updates };
     }
 
-    showToast(message, type = 'info') {
+    showToast(message, type = 'info', action = null) {
         const container = document.getElementById('toast-container');
         const toast = document.createElement('div');
-        toast.className = `toast ${type}`;
-        toast.textContent = message;
+        toast.className = `toast ${type} flex items-center justify-between gap-4`;
+
+        const text = document.createElement('span');
+        text.textContent = message;
+        toast.appendChild(text);
+
+        if (action) {
+            const btn = document.createElement('button');
+            btn.className = 'btn btn-xs btn-outline-white';
+            btn.style.padding = '0.25rem 0.5rem';
+            btn.style.fontSize = '0.75rem';
+            btn.style.border = '1px solid rgba(255,255,255,0.3)';
+            btn.style.background = 'rgba(255,255,255,0.1)';
+            btn.style.borderRadius = '4px';
+            btn.style.color = 'white';
+            btn.textContent = action.label;
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                action.callback();
+                toast.remove();
+            };
+            toast.appendChild(btn);
+        }
+
         container.appendChild(toast);
 
-        // Supprimer après 3 secondes
+        // Supprimer après 5 secondes si action, sinon 3
+        const delay = action ? 8000 : 3000;
         setTimeout(() => {
-            toast.remove();
-        }, 3000);
+            if (toast.parentElement) toast.remove();
+        }, delay);
     }
 
     showLoading(message = 'Chargement...') {
@@ -274,10 +297,22 @@ class App {
                 try {
                     this.showLoading('Reconnexion...');
                     await multiplayerService.joinRoom(session.roomCode, session.playerName, session.isHost);
+
                     overlay.remove();
                     this.hideLoading();
                     this.showToast('Revenu dans la partie !', 'success');
-                    this.navigate('/multiplayer');
+
+                    // Si une dictée était en cours, on y retourne directement
+                    if (session.activeDictation) {
+                        this.setState({
+                            multiplayerDictation: session.activeDictation,
+                            currentTheme: session.activeTheme || { name: 'Dictée', icon: '📝' }
+                        });
+                        this.navigate('/dictation');
+                    } else {
+                        this.navigate('/multiplayer');
+                    }
+
                     resolve();
                 } catch (e) {
                     this.showToast('Erreur reconnexion : ' + e.message, 'error');
